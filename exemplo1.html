@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <style>
+        .card{
+            width: 300px;
+            height: 300px;
+            background: #666;
+            border: solid 1px #333;
+            cursor: move;
+            position: absolute;
+            box-shadow: #333 1px 1px 25px;
+        }
+    </style>
+</head>
+<body>
+    <div class="card"></div>
+
+    <script src="https://unpkg.com/@reactivex/rxjs@6.3.3/dist/global/rxjs.umd.js"></script>
+    <script>
+        // o merge é um operador de criação, ele une dois streams
+        const { fromEvent, merge } = rxjs;
+        // o switchMap() é usado para controle de concorrencia 
+        const { switchMap, takeUntil, map, delay, filter, tap, skip } = rxjs.operators;
+
+        const card = document.querySelector('.card');
+        // convenção para observable$
+        const mouseDown$ = fromEvent(card, 'mousedown');
+        const mouseUp$ = fromEvent(document, 'mouseup');
+        const mouseMove$ = fromEvent(document, 'mousemove');
+        // vamos usar o keyup  para dublicar o quadrado quando um tecla for pressionada
+        const keyUp$ = fromEvent(document, 'keyup');
+
+        const dragAndDrop = mouseDown$.pipe(
+            // estilo o map do array, pega um valor e transforma em alguma coisa
+            map(e => ({  // esse e seria o proprio evento do mouseDown$
+                x: e.clientX,
+                y: e.clientY,
+                target: {
+                    x: e.target.offsetLeft,
+                    y: e.target.offsetTop
+                }
+            })),
+            // pelo que entendi o switchMap se desinscreve do evento anterior(mouseDown) e se inscreve nesse dai(mouseMove).
+            // ele garante que a ultima inscrição é a que vai estar ativa
+            switchMap(start => merge( // o merge aqui é para ouvir neste caso 2 eventos distintos
+                mouseMove$.pipe(
+                    map(e => ({  // nesse map ele faz os calculos para a nova posiçao
+                        x: e.clientX - start.x + start.target.x,
+                        y: e.clientY - start.y + start.target.y
+                    })),
+                    takeUntil(mouseUp$) // vai ficar ouvindo o mouseMove até que tenha um mouseUp
+                ),
+                keyUp$.pipe(
+                    // parecido com o filter do array
+                    filter(e => e.which === 32), // aqui ele filtra pela tecla espaço do teclado
+                    // o tap() faz uma operação e retorna a mesma entrada, no caso 'tecla', ele não altera o streaming
+                    tap(tecla => document.body.insertBefore(card.cloneNode(true), card)), // aqui clonamos o card
+                    // ele ignora as emissoes desse source, foi usado aqui pra nao estragar o subscribe abaixo
+                    // pois ele nao vai retornar aqui um objeto x,y para fazer o drag and drop
+                    skip()
+                )
+            ))
+        );
+        
+        // se inscreve no evento
+        dragAndDrop.pipe(
+            delay(200) // aqui passamos um delay só de brinks 200milisegundos
+        ).subscribe(v => {
+            card.style.top = `${v.y}px`;
+            card.style.left = `${v.x}px`;
+        })
+    </script>
+    <script src="./script16.js"></script>    
+</body>
+</html>

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <style>
+    </style>
+</head>
+<body>
+   
+    <!-- 
+        CONCORRENCIA
+    O Rxjs tem 4 metodos pra trabalhar com concorrencia: mergeMap, concatMap, switchMap e exhaustMap
+     -->
+    <script src="https://unpkg.com/@reactivex/rxjs@6.3.3/dist/global/rxjs.umd.js"></script>
+    <script>
+        const { of, ajax: {ajax}} = rxjs;
+        const { mergeMap, pluck, concatMap, switchMap, exhaustMap } = rxjs.operators;
+
+        const api = (response, delay) =>
+            ajax({
+                url: `http://localhost:5000/response/${JSON.stringify(response)}/delay/${delay}/`
+            });
+        
+
+        const a = api({data: "A"}, 1000);
+        const b = api({data: "B"}, 1000);
+        const c = api({data: "C"}, 800);
+        const d = api({data: "D"}, 1800);
+        const e = api({data: "E"}, 1200);
+        const f = api({data: "F"}, 1600);
+        const g = api({data: "G"}, 2800);
+        const h = api({data: "H"}, 700);
+
+        // o of é quem vai passar pra frente os observables, pois o ajax é lazy, ele só é executado quando tem um subscribe
+        of(a,b,c,d,e,f,g,h)
+            .pipe(
+                // o mergeMap me parece que ele só vai se inscrever na parada, e faz as requisiçoes em paralelo
+                // tambem podemos dizer quantas requisiçoes podem ser feitas em paralelo, passando um argumento
+                mergeMap(e => e, 4),
+                // o concatMap faz as requisiçoes serem em serial, uma requisiçao espera uma terminar para começar a outra
+                // concatMap(e => e),
+                // switchMap ele cancela o observable anterior e executa o próximo
+                // switchMap(e => e),
+                // exhaustMap, faz o contrario do switchMap, mantém só a primeira requisiçao
+                // exhaustMap(e => e),
+                pluck('response', 'data')
+            )
+            .subscribe(
+                x => console.log(x),
+                err => console.log(err),
+                _ => console.log('Complete'),
+            );
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <style>
+    </style>
+</head>
+<body>
+    <button id="btn1">Fazer Request</button>
+    <button id="btn2">Parar Request</button>
+    <div id="content"></div>
+   
+    <script src="https://unpkg.com/@reactivex/rxjs@6.3.3/dist/global/rxjs.umd.js"></script>
+    <script>
+        const { fromEvent, ajax: {ajax}} = rxjs;
+        const { tap, pluck,  switchMap, race } = rxjs.operators;
+        // No race vai ter um ou mais observables, o que acontecer primeiro ele anula os outros
+
+        const fazerRequisicao = document.querySelector("#btn1");
+        const pararRequisicao = document.querySelector("#btn1");
+        const content = document.querySelector("#content");
+
+        const btnRequest$ = fromEvent(fazerRequisicao, 'click');
+        const btnPararRequest$ = fromEvent(pararRequisicao, 'click');
+
+        const setContent = text => content.innerHTML = text; 
+        const requestApi = api({data: "Resposta da api"}, 2000).pipe(
+            pluck('response', 'data'),
+            tap(setContent) 
+        )
+
+        btnRequest$.pipe(
+            tap(() => {setContent('Loading...') }),
+            switchMap(() => requestApi)
+        ).subscribe();
+
+
+        const api = (response, delay) =>
+            ajax({
+                url: `http://localhost:5000/response/${JSON.stringify(response)}/delay/${delay}/`
+            });
+
+        
+        
+    </script>
+</body>
+</html>

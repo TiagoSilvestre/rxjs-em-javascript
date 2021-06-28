@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <style>
+    </style>
+</head>
+<body>
+    <div class="content">
+        <input type="text" placeholder="País...">
+        <ul></ul>
+    </div>
+
+    <script src="https://unpkg.com/@reactivex/rxjs@6.3.3/dist/global/rxjs.umd.js"></script>
+    <script>
+        // FOI USADA ESSA API NESSE EXEMPLO: http://restcountries.eu/
+        // esse ajax é como se fosse o fetch, porem ele tem algumas peculiaridades que da de cancele uma requisição dependendo do tipo de operador que tais usando
+        const { fromEvent, ajax: {ajax}, of } = rxjs;
+        const { pluck, map, debounceTime, switchMap, catchError, distinctUntilChanged, startWith } = rxjs.operators;
+
+        const input = fromEvent(document.querySelector("input"), 'input');
+        const ul = document.querySelector("ul");
+
+        const mostrarResultado = res => {
+            ul.innerHTML = res.map(e => `<li>${e}</li>`).join('');
+        }
+
+        const buscaPaisesNaApi = termo => ajax(`https://restcountries.eu/rest/v2/name/${termo}?fields=name`).pipe(
+            //o ajax vai retornar um observable, que o dado real vai estar na propriedade response
+            // o operador pluck pega um objeto e extrai uma propriedade daquele objeto
+            pluck('response'),
+            map(resposta => resposta.map(e => e.name))
+        );
+
+        input.pipe(
+            // aqui foi usado o debounceTime para ele esperar um pouquinho(300ms) pra ele não ficar fazendo uma requisição a cada letra digitada pelo usuário
+            debounceTime(300),
+            pluck('target', 'value'), // aqui estamos pegando a propriedade target.value do input, acho que isso vem do native element
+            map(e => e.trim()), //aqui limpamos os espaços em branco
+            // aqui ele verifica se o valor anterior é diferente do corrente, para não haver 2 buscas com o mesmo valor
+            distinctUntilChanged(),
+            // caso o usuario tenha feito uma busca e mude de ideia, e apague tudo e digite uma nova busca, com o switchMap iremos cancelar uma requisição
+            // e iniciar outra, abaixo ele se inscreve em um novo observable e ignora(desinscreve) o anterior
+            switchMap(termo => {
+                if(!termo || termo.length < 3) return of([]) // se a busca estiver vazia ou for menor de 3 caracteres, retorna um array vazio
+                return buscaPaisesNaApi(termo);
+            }),
+            // caso a api retorne um 404, ou seja nenhum dado encontrado, o observable vai cair no error, e isso mata o stream, impossibilitando de emitir 
+            // novos valores, para tratar isso vamos usar o catchError
+            catchError((err, source) => {
+                // o source é a propria fonte, ou seja o proprio observable
+                return source.pipe(
+                    // para apagar os antigos valores que estiverem na tela quando um valor errado for digitado, utilizamos o pipe
+                    // startWith que inicia com o valor passado 
+                    startWith([])
+                );
+            })
+        ).subscribe(mostrarResultado);
+    </script>
+</body>
+</html>
